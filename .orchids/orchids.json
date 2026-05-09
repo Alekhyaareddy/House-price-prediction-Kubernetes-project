@@ -1,0 +1,8 @@
+{
+  "startupCommands": [
+    "cd /home/user/app/backend && python app.py",
+    "cd /home/user/app/frontend && npm install && npm run dev"
+  ],
+  "projectId": "a4b86144-d031-4fe0-9bf9-69d75811be48",
+  "templateId": "any"
+}

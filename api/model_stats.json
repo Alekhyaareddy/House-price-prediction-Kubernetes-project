@@ -1,0 +1,1 @@
+{"sqft_min": 1000, "sqft_max": 2999, "sqft_mean": 2006.37468, "year_min": 1950, "year_max": 2021, "price_min": -36588.16539749279, "price_max": 492195.2599720151, "price_mean": 224827.32515099045, "neighborhoods": ["Rural", "Suburb", "Urban"], "mae": 39625.1479199344, "r2": 0.5701081152868407, "rmse": 49674.534411084955, "total_records": 50000}
