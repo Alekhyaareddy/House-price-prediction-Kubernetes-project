@@ -19,8 +19,8 @@ spec:
     spec:
       containers:
       - name: frontend
-        image:  house-price-frontend:v5
-        imagePullPolicy: Never
+        image: alekhyaah/house-price-frontend:latest
+        imagePullPolicy: Always
 
         ports:
         - containerPort: 80
