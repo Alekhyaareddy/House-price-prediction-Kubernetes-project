@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: alekhyaah/house-price-backend:latest
+        image: alekhyaah/house-price-backend:v7
         imagePullPolicy: Never
 
         ports:
