@@ -4,3 +4,7 @@ dist/
 build/
 __pycache__/
 .env
+# Terraform generated files
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*

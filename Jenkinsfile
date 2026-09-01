@@ -3,6 +3,7 @@ pipeline {
 
     stages {
 
+
         stage('Clone Repository') {
             steps {
                 git 'https://github.com/Alekhyaareddy/House-price-prediction-Kubernetes-project'

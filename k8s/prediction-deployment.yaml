@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: prediction-deployment
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: prediction
+
+  template:
+    metadata:
+      labels:
+        app: prediction
+
+    spec:
+      containers:
+      - name: prediction-service
+        image: prediction-service:latest
+        imagePullPolicy: Never
+
+        ports:
+        - containerPort: 5000

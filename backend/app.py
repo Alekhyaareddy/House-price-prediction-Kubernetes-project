@@ -1,97 +1,82 @@
+
 from flask import Flask, request, jsonify
+from prometheus_flask_exporter import PrometheusMetrics
 from flask_cors import CORS
 import pandas as pd
-import numpy as np
-import joblib
 import json
 import os
+import requests
 
 app = Flask(__name__)
+metrics = PrometheusMetrics(app)
 CORS(app)
 
-# Load model artifacts
-model = joblib.load('model.pkl')
-scaler = joblib.load('scaler.pkl')
-label_encoder = joblib.load('label_encoder.pkl')
+# Prediction Service URL
+PREDICTION_SERVICE_URL = os.getenv(
+    'PREDICTION_SERVICE_URL',
+    'http://prediction-service:5000'
+)
+# Analytics Service URL
+ANALYTICS_SERVICE_URL = os.getenv(
+    'ANALYTICS_SERVICE_URL',
+    'http://analytics-service:5000'
+)
 
+# Load model statistics
 with open('model_stats.json', 'r') as f:
     model_stats = json.load(f)
 
 # Load dataset for comparisons and charts
 df = pd.read_csv('housing_price_dataset.csv')
 
+
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'ok', 'message': 'House Price Prediction API is running'})
+    return jsonify({
+        'status': 'ok',
+        'message': 'House Price Prediction API is running'
+    })
+
 
 @app.route('/stats', methods=['GET'])
 def stats():
     return jsonify(model_stats)
+@app.route('/analytics', methods=['GET'])
+def analytics():
+    try:
+        response = requests.get(
+            f'{ANALYTICS_SERVICE_URL}/analytics',
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        return jsonify(response.json())
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
 
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
         data = request.get_json()
 
-        square_feet = float(data['SquareFeet'])
-        bedrooms = int(data['Bedrooms'])
-        bathrooms = int(data['Bathrooms'])
-        neighborhood = data['Neighborhood']
-        year_built = int(data['YearBuilt'])
-
-        neighborhood_encoded = label_encoder.transform([neighborhood])[0]
-
-        features = np.array([[square_feet, bedrooms, bathrooms, neighborhood_encoded, year_built]])
-        features_scaled = scaler.transform(features)
-
-        prediction = model.predict(features_scaled)[0]
-
-        # Find similar houses
-        df['distance'] = (
-            ((df['SquareFeet'] - square_feet) / df['SquareFeet'].std()) ** 2 +
-            ((df['Bedrooms'] - bedrooms) / max(df['Bedrooms'].std(), 0.01)) ** 2 +
-            ((df['Bathrooms'] - bathrooms) / max(df['Bathrooms'].std(), 0.01)) ** 2 +
-            ((df['YearBuilt'] - year_built) / df['YearBuilt'].std()) ** 2
+        # Send prediction request to Prediction Service
+        prediction_response = requests.post(
+            f'{PREDICTION_SERVICE_URL}/predict',
+            json=data,
+            timeout=30
         )
-        similar = df[df['Neighborhood'] == neighborhood].nsmallest(5, 'distance')[
-            ['SquareFeet', 'Bedrooms', 'Bathrooms', 'YearBuilt', 'Price']
-        ].to_dict('records')
 
-        # Price range (confidence band)
-        price_low = prediction * 0.92
-        price_high = prediction * 1.08
+        prediction_response.raise_for_status()
 
-        # Price per sqft
-        price_per_sqft = prediction / square_feet
-
-        # Neighborhood avg comparison
-        neighborhood_avg = df[df['Neighborhood'] == neighborhood]['Price'].mean()
-        overall_avg = df['Price'].mean()
-
-        # Price breakdown by factor
-        neighborhood_premium = {
-            'Urban': 1.15,
-            'Suburb': 1.08,
-            'Rural': 0.88
-        }.get(neighborhood, 1.0)
-
-        age_factor = max(0.7, 1.0 - (2026 - year_built) * 0.003)
-
-        return jsonify({
-            'predicted_price': round(prediction, 2),
-            'price_low': round(price_low, 2),
-            'price_high': round(price_high, 2),
-            'price_per_sqft': round(price_per_sqft, 2),
-            'neighborhood_avg': round(neighborhood_avg, 2),
-            'overall_avg': round(overall_avg, 2),
-            'similar_houses': similar,
-            'vs_neighborhood': round((prediction / neighborhood_avg - 1) * 100, 1),
-            'vs_market': round((prediction / overall_avg - 1) * 100, 1),
-            'model_accuracy': round(model_stats['r2'] * 100, 1)
-        })
+        # Return prediction service response directly
+        return jsonify(prediction_response.json())
 
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
 
 @app.route('/dataset/distribution', methods=['GET'])
 def distribution():
@@ -107,13 +92,15 @@ def distribution():
 
     price_dist = [
         {
-            'range': f"${int(interval.left/1000)}k-${int(interval.right/1000)}k",
+            'range': f"${int(interval.left / 1000)}k-${int(interval.right / 1000)}k",
             'count': int(count)
         }
         for interval, count in dist.items()
     ]
 
-    sqft_price = filtered[['SquareFeet', 'Price', 'Neighborhood']].sample(
+    sqft_price = filtered[
+        ['SquareFeet', 'Price', 'Neighborhood']
+    ].sample(
         min(200, len(filtered))
     ).to_dict('records')
 
@@ -130,5 +117,7 @@ def distribution():
         'neighborhood_stats': neighborhood_stats
     })
 
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=5000)
+
